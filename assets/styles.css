@@ -77,3 +77,42 @@ button,input{font:inherit}
 .reader-error{max-width:520px;margin:20px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--muted)}
 @media(min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(min-width:900px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+
+/* ============================================================
+   PINCH ZOOM / PAN DEL PDF
+   ============================================================ */
+.reader-page-area{
+  touch-action:none;
+}
+
+#pdf-canvas{
+  transform-origin:center center;
+  will-change:transform;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.reader-fullscreen.zoomed .tap-zone,
+.reader-fullscreen.zoomed .reader-center-zone{
+  pointer-events:none;
+}
+
+.zoom-badge{
+  position:absolute;
+  top:12px;
+  right:12px;
+  z-index:8;
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(0,0,0,.55);
+  color:#fff;
+  font-size:12px;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s ease;
+}
+
+.reader-fullscreen.zoomed .zoom-badge{
+  opacity:1;
+}

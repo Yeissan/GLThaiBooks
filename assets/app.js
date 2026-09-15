@@ -99,7 +99,7 @@ async function renderReader(id){
         <button class="tap-zone tap-zone-left" id="tap-left" type="button" aria-label="Página anterior"></button>
         <div class="reader-center-zone" id="tap-center"></div>
         <button class="tap-zone tap-zone-right" id="tap-right" type="button" aria-label="Página siguiente"></button>
-        <div class="page-turn-hint">Toca izquierda o derecha para pasar página</div>
+        <div class="page-turn-hint">Toca izquierda o derecha para pasar página</div><div class="zoom-badge" id="zoom-badge">100%</div>
       </div>
       <div class="reader-bottom">
         <div class="reader-bottom-row"><span id="page-label">Página — de —</span><span id="percent-label">0% leído</span></div>
@@ -117,6 +117,7 @@ async function renderReader(id){
   const topPageLabel=document.getElementById('top-page-label');
   const percentLabel=document.getElementById('percent-label');
   const progressFill=document.getElementById('reader-progress-fill');
+  const zoomBadge=document.getElementById('zoom-badge');
 
   document.getElementById('back-book').addEventListener('click',()=>setHash('libro='+encodeURIComponent(id)));
 
@@ -132,6 +133,40 @@ async function renderReader(id){
     const saved=await getProgress(id);
     let currentPage=Math.min(Math.max(saved?.page||1,1),pdf.numPages);
     let rendering=false,pending=null,touchStartX=null,touchStartY=null;
+
+    let zoom=1;
+    let panX=0;
+    let panY=0;
+    let pinchStartDistance=0;
+    let pinchStartZoom=1;
+    let panStartX=0;
+    let panStartY=0;
+    let panOriginX=0;
+    let panOriginY=0;
+    let lastTapTime=0;
+
+    function distanceBetween(t1,t2){
+      const dx=t2.clientX-t1.clientX;
+      const dy=t2.clientY-t1.clientY;
+      return Math.hypot(dx,dy);
+    }
+
+    function clampZoom(value){
+      return Math.max(1,Math.min(4,value));
+    }
+
+    function applyTransform(){
+      canvas.style.transform=`translate(${panX}px, ${panY}px) scale(${zoom})`;
+      zoomBadge.textContent=`${Math.round(zoom*100)}%`;
+      full.classList.toggle('zoomed',zoom>1.01);
+    }
+
+    function resetZoom(){
+      zoom=1;
+      panX=0;
+      panY=0;
+      applyTransform();
+    }
 
     async function draw(pageNum){
       pageNum=Math.min(Math.max(pageNum,1),pdf.numPages);
@@ -151,6 +186,7 @@ async function renderReader(id){
         canvas.style.height=`${Math.floor(viewport.height)}px`;
         await page.render({canvasContext:ctx,viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
         currentPage=pageNum;
+        resetZoom();
         const percent=pct(currentPage,pdf.numPages);
         pageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
         topPageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
@@ -172,19 +208,100 @@ async function renderReader(id){
     tapRight.addEventListener('click',next);
     tapCenter.addEventListener('click',()=>{full.classList.toggle('reader-ui-hidden');setTimeout(()=>draw(currentPage),0)});
 
+    canvas.addEventListener('dblclick',()=>{
+      if(zoom>1.01) resetZoom();
+      else{
+        zoom=2;
+        applyTransform();
+      }
+    });
+
+
     pageArea.addEventListener('touchstart',e=>{
       if(!e.touches?.length)return;
-      touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY;
-    },{passive:true});
+
+      if(e.touches.length===2){
+        pinchStartDistance=distanceBetween(e.touches[0],e.touches[1]);
+        pinchStartZoom=zoom;
+        return;
+      }
+
+      const t=e.touches[0];
+
+      if(zoom>1.01){
+        panStartX=t.clientX;
+        panStartY=t.clientY;
+        panOriginX=panX;
+        panOriginY=panY;
+      }else{
+        touchStartX=t.clientX;
+        touchStartY=t.clientY;
+      }
+    },{passive:false});
+
+    pageArea.addEventListener('touchmove',e=>{
+      if(e.touches.length===2){
+        e.preventDefault();
+        const d=distanceBetween(e.touches[0],e.touches[1]);
+        if(pinchStartDistance>0){
+          zoom=clampZoom(pinchStartZoom*(d/pinchStartDistance));
+          if(zoom<=1.01){
+            zoom=1;
+            panX=0;
+            panY=0;
+          }
+          applyTransform();
+        }
+        return;
+      }
+
+      if(e.touches.length===1 && zoom>1.01){
+        e.preventDefault();
+        const t=e.touches[0];
+        panX=panOriginX+(t.clientX-panStartX);
+        panY=panOriginY+(t.clientY-panStartY);
+        applyTransform();
+      }
+    },{passive:false});
 
     pageArea.addEventListener('touchend',e=>{
+      if(e.touches.length===0){
+        pinchStartDistance=0;
+      }
+
+      if(zoom>1.01){
+        touchStartX=null;
+        touchStartY=null;
+        return;
+      }
+
       if(touchStartX===null||!e.changedTouches?.length)return;
-      const dx=e.changedTouches[0].clientX-touchStartX;
-      const dy=e.changedTouches[0].clientY-touchStartY;
-      touchStartX=null;touchStartY=null;
+
+      const now=Date.now();
+      const t=e.changedTouches[0];
+      const dx=t.clientX-touchStartX;
+      const dy=t.clientY-touchStartY;
+
+      if(Math.abs(dx)<12 && Math.abs(dy)<12){
+        if(now-lastTapTime<300){
+          zoom=2;
+          panX=0;
+          panY=0;
+          applyTransform();
+          lastTapTime=0;
+          touchStartX=null;
+          touchStartY=null;
+          return;
+        }
+        lastTapTime=now;
+      }
+
+      touchStartX=null;
+      touchStartY=null;
+
       if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy))return;
       dx<0?next():prev();
-    },{passive:true});
+    },{passive:false});
 
     full.tabIndex=0;
     full.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')prev();if(e.key==='ArrowRight')next()});
