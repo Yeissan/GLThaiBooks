@@ -1,1 +1,20 @@
-
+{
+  "books": [
+    {
+      "id": "libro-de-ejemplo",
+      "title": "Libro de ejemplo",
+      "author": "Autor",
+      "year": "2026",
+      "language": "Español",
+      "publisher": "",
+      "genres": [
+        "Romance",
+        "GL"
+      ],
+      "description": "Descripción del libro.",
+      "telegram_url": "",
+      "pdf_url": "",
+      "cover": "books/Ejemplo/cover.jpg"
+    }
+  ]
+}
