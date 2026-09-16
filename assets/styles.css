@@ -116,3 +116,96 @@ button,input{font:inherit}
 .reader-fullscreen.zoomed .zoom-badge{
   opacity:1;
 }
+
+
+/* ============================================================
+   CORRECCIÓN DE ZOOM MÓVIL
+   - El zoom afecta solo al PDF.
+   - Los controles no se escalan.
+   - Los toques izquierda/derecha siguen pasando página.
+   ============================================================ */
+
+.reader-fullscreen{
+  overscroll-behavior:none;
+  touch-action:manipulation;
+}
+
+.reader-page-area{
+  overflow:hidden;
+  touch-action:none;
+  overscroll-behavior:none;
+}
+
+#pdf-canvas{
+  transform-origin:center center;
+  will-change:transform;
+  touch-action:none;
+}
+
+/* Las zonas de cambio de página permanecen disponibles incluso con zoom. */
+.reader-fullscreen.zoomed .tap-zone{
+  pointer-events:auto;
+}
+
+/* El centro se desactiva mientras hay zoom para no ocultar controles al mover el PDF. */
+.reader-fullscreen.zoomed .reader-center-zone{
+  pointer-events:none;
+}
+
+
+/* ============================================================
+   ZOOM PERSISTENTE REAL
+   El zoom se aplica a un contenedor estable (.pdf-stage),
+   no al canvas que se vuelve a dibujar al cambiar de página.
+   ============================================================ */
+.pdf-stage{
+  position:relative;
+  flex:0 0 auto;
+  transform-origin:center center;
+  will-change:transform;
+  touch-action:none;
+}
+
+.pdf-stage #pdf-canvas{
+  display:block;
+  transform:none !important;
+  transform-origin:initial;
+  will-change:auto;
+}
+
+
+/* ============================================================
+   PASAR PÁGINA AUNQUE EL PDF ESTÉ AMPLIADO
+   Las bandas laterales quedan siempre por encima del PDF.
+   ============================================================ */
+.tap-zone{
+  z-index:20 !important;
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+}
+
+.reader-center-zone{
+  z-index:6;
+}
+
+.pdf-stage{
+  z-index:2;
+}
+
+/* Las zonas laterales ocupan solo el borde para no impedir mover el PDF. */
+.tap-zone{
+  width:22% !important;
+}
+
+.tap-zone-left{left:0}
+.tap-zone-right{right:0}
+
+.reader-center-zone{
+  left:22% !important;
+  right:22% !important;
+}
+
+/* Cuando hay zoom, el centro sigue dejando mover el PDF. */
+.reader-fullscreen.zoomed .reader-center-zone{
+  pointer-events:none !important;
+}

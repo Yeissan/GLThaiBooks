@@ -95,7 +95,7 @@ async function renderReader(id){
         <div class="reader-title-mini"><strong>${esc(b.title)}</strong><span id="top-page-label">Preparando lector…</span></div>
       </div>
       <div class="reader-page-area" id="reader-page-area">
-        <canvas id="pdf-canvas"></canvas>
+        <div class="pdf-stage" id="pdf-stage"><canvas id="pdf-canvas"></canvas></div>
         <button class="tap-zone tap-zone-left" id="tap-left" type="button" aria-label="Página anterior"></button>
         <div class="reader-center-zone" id="tap-center"></div>
         <button class="tap-zone tap-zone-right" id="tap-right" type="button" aria-label="Página siguiente"></button>
@@ -109,6 +109,7 @@ async function renderReader(id){
 
   const full=document.getElementById('reader-fullscreen');
   const pageArea=document.getElementById('reader-page-area');
+  const stage=document.getElementById('pdf-stage');
   const canvas=document.getElementById('pdf-canvas');
   const ctx=canvas.getContext('2d');
   const tapLeft=document.getElementById('tap-left'),tapRight=document.getElementById('tap-right');
@@ -156,9 +157,25 @@ async function renderReader(id){
     }
 
     function applyTransform(){
-      canvas.style.transform=`translate(${panX}px, ${panY}px) scale(${zoom})`;
+      stage.style.transform=`translate(${panX}px, ${panY}px) scale(${zoom})`;
       zoomBadge.textContent=`${Math.round(zoom*100)}%`;
       full.classList.toggle('zoomed',zoom>1.01);
+    }
+
+    function clampPan(){
+      if(zoom<=1.01){
+        panX=0;
+        panY=0;
+        return;
+      }
+
+      const scaledW=stage.clientWidth*zoom;
+      const scaledH=stage.clientHeight*zoom;
+      const maxX=Math.max(0,(scaledW-pageArea.clientWidth)/2);
+      const maxY=Math.max(0,(scaledH-pageArea.clientHeight)/2);
+
+      panX=Math.max(-maxX,Math.min(maxX,panX));
+      panY=Math.max(-maxY,Math.min(maxY,panY));
     }
 
     function resetZoom(){
@@ -184,9 +201,23 @@ async function renderReader(id){
         canvas.height=Math.floor(viewport.height*dpr);
         canvas.style.width=`${Math.floor(viewport.width)}px`;
         canvas.style.height=`${Math.floor(viewport.height)}px`;
+        stage.style.width=`${Math.floor(viewport.width)}px`;
+        stage.style.height=`${Math.floor(viewport.height)}px`;
         await page.render({canvasContext:ctx,viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
         currentPage=pageNum;
-        resetZoom();
+
+        // El zoom pertenece al lector, no a una página concreta.
+        // Al cambiar de hoja conservamos exactamente el mismo zoom.
+        clampPan();
+        applyTransform();
+
+        // Algunos WebViews de Telegram recalculan estilos al cambiar el bitmap
+        // del canvas. Reaplicamos el transform en el siguiente frame.
+        requestAnimationFrame(() => {
+          clampPan();
+          applyTransform();
+        });
+
         const percent=pct(currentPage,pdf.numPages);
         pageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
         topPageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
@@ -203,32 +234,37 @@ async function renderReader(id){
 
     const prev=()=>currentPage>1&&draw(currentPage-1);
     const next=()=>currentPage<pdf.numPages&&draw(currentPage+1);
-
-    tapLeft.addEventListener('click',prev);
-    tapRight.addEventListener('click',next);
-    tapCenter.addEventListener('click',()=>{full.classList.toggle('reader-ui-hidden');setTimeout(()=>draw(currentPage),0)});
-
-    canvas.addEventListener('dblclick',()=>{
-      if(zoom>1.01) resetZoom();
-      else{
-        zoom=2;
-        applyTransform();
-      }
+// Evita que el WebView amplíe toda la interfaz.
+    ['gesturestart','gesturechange','gestureend'].forEach(name=>{
+      document.addEventListener(name,e=>e.preventDefault(),{passive:false});
     });
 
+    let gestureMoved=false;
+    let touchStartedAt=0;
+    let singleStartX=null;
+    let singleStartY=null;
 
     pageArea.addEventListener('touchstart',e=>{
-      if(!e.touches?.length)return;
+      if(e.target.closest?.('.tap-zone')) return;
+
+      touchStartedAt=Date.now();
+      gestureMoved=false;
 
       if(e.touches.length===2){
+        e.preventDefault();
         pinchStartDistance=distanceBetween(e.touches[0],e.touches[1]);
         pinchStartZoom=zoom;
         return;
       }
 
+      if(e.touches.length!==1)return;
+
       const t=e.touches[0];
+      singleStartX=t.clientX;
+      singleStartY=t.clientY;
 
       if(zoom>1.01){
+        e.preventDefault();
         panStartX=t.clientX;
         panStartY=t.clientY;
         panOriginX=panX;
@@ -240,68 +276,172 @@ async function renderReader(id){
     },{passive:false});
 
     pageArea.addEventListener('touchmove',e=>{
+      if(e.target.closest?.('.tap-zone')) return;
+
       if(e.touches.length===2){
         e.preventDefault();
+        gestureMoved=true;
+
         const d=distanceBetween(e.touches[0],e.touches[1]);
+
         if(pinchStartDistance>0){
           zoom=clampZoom(pinchStartZoom*(d/pinchStartDistance));
+
           if(zoom<=1.01){
             zoom=1;
             panX=0;
             panY=0;
           }
+
           applyTransform();
         }
+
         return;
       }
 
       if(e.touches.length===1 && zoom>1.01){
         e.preventDefault();
+
         const t=e.touches[0];
-        panX=panOriginX+(t.clientX-panStartX);
-        panY=panOriginY+(t.clientY-panStartY);
+        const dx=t.clientX-panStartX;
+        const dy=t.clientY-panStartY;
+
+        if(Math.abs(dx)>4 || Math.abs(dy)>4){
+          gestureMoved=true;
+        }
+
+        panX=panOriginX+dx;
+        panY=panOriginY+dy;
+        clampPan();
         applyTransform();
       }
     },{passive:false});
 
     pageArea.addEventListener('touchend',e=>{
+      if(e.target.closest?.('.tap-zone')) return;
+
       if(e.touches.length===0){
         pinchStartDistance=0;
       }
 
-      if(zoom>1.01){
+      if(!e.changedTouches?.length)return;
+
+      const t=e.changedTouches[0];
+      const endX=t.clientX;
+      const endY=t.clientY;
+      const width=pageArea.clientWidth;
+      const elapsed=Date.now()-touchStartedAt;
+
+      const dx=(singleStartX===null)?0:endX-singleStartX;
+      const dy=(singleStartY===null)?0:endY-singleStartY;
+      const wasTap=!gestureMoved && Math.abs(dx)<14 && Math.abs(dy)<14 && elapsed<500;
+
+      // Doble toque: 2x / volver a 100%.
+      if(wasTap){
+        const now=Date.now();
+
+        if(now-lastTapTime<300){
+          if(zoom>1.01){
+            resetZoom();
+          }else{
+            zoom=2;
+            panX=0;
+            panY=0;
+            applyTransform();
+          }
+
+          lastTapTime=0;
+          singleStartX=null;
+          singleStartY=null;
+          touchStartX=null;
+          touchStartY=null;
+          return;
+        }
+
+        lastTapTime=now;
+
+        // Un toque en el 40% izquierdo/derecho pasa página,
+        // incluso cuando el PDF está ampliado.
+        if(endX < width*0.40){
+          prev();
+        }else if(endX > width*0.60){
+          next();
+        }else if(zoom<=1.01){
+          full.classList.toggle('reader-ui-hidden');
+          setTimeout(()=>draw(currentPage),0);
+        }
+
+        singleStartX=null;
+        singleStartY=null;
         touchStartX=null;
         touchStartY=null;
         return;
       }
 
-      if(touchStartX===null||!e.changedTouches?.length)return;
-
-      const now=Date.now();
-      const t=e.changedTouches[0];
-      const dx=t.clientX-touchStartX;
-      const dy=t.clientY-touchStartY;
-
-      if(Math.abs(dx)<12 && Math.abs(dy)<12){
-        if(now-lastTapTime<300){
-          zoom=2;
-          panX=0;
-          panY=0;
-          applyTransform();
-          lastTapTime=0;
-          touchStartX=null;
-          touchStartY=null;
-          return;
-        }
-        lastTapTime=now;
+      // Swipe para pasar página solo a 100%, para no interferir con el pan.
+      if(zoom<=1.01 && Math.abs(dx)>=45 && Math.abs(dx)>Math.abs(dy)){
+        dx<0 ? next() : prev();
       }
 
+      singleStartX=null;
+      singleStartY=null;
       touchStartX=null;
       touchStartY=null;
-
-      if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy))return;
-      dx<0?next():prev();
     },{passive:false});
+
+    // Click/tap de las zonas transparentes: útil en Android y en PC.
+
+
+    // Doble clic en PC/tablet.
+    stage.addEventListener('dblclick',e=>{
+      e.preventDefault();
+      if(zoom>1.01) resetZoom();
+      else{
+        zoom=2;
+        panX=0;
+        panY=0;
+        applyTransform();
+      }
+    });
+
+
+    function edgeTurnHandler(direction){
+      return e=>{
+        // Con un solo toque en el borde, cambia de página.
+        // Evitamos que el gesto llegue al manejador de pan/zoom.
+        if(e.touches && e.touches.length>0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        if(direction==='prev') prev();
+        else next();
+      };
+    }
+
+    tapLeft.addEventListener(
+      'touchend',
+      edgeTurnHandler('prev'),
+      {passive:false}
+    );
+
+    tapRight.addEventListener(
+      'touchend',
+      edgeTurnHandler('next'),
+      {passive:false}
+    );
+
+    // Ratón / escritorio.
+    tapLeft.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      prev();
+    });
+
+    tapRight.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      next();
+    });
 
     full.tabIndex=0;
     full.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')prev();if(e.key==='ArrowRight')next()});
