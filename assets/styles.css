@@ -116,3 +116,38 @@ button,input{font:inherit}
 .reader-fullscreen.zoomed .zoom-badge{
   opacity:1;
 }
+
+
+/* ============================================================
+   CORRECCIÓN DE ZOOM MÓVIL
+   - El zoom afecta solo al PDF.
+   - Los controles no se escalan.
+   - Los toques izquierda/derecha siguen pasando página.
+   ============================================================ */
+
+.reader-fullscreen{
+  overscroll-behavior:none;
+  touch-action:manipulation;
+}
+
+.reader-page-area{
+  overflow:hidden;
+  touch-action:none;
+  overscroll-behavior:none;
+}
+
+#pdf-canvas{
+  transform-origin:center center;
+  will-change:transform;
+  touch-action:none;
+}
+
+/* Las zonas de cambio de página permanecen disponibles incluso con zoom. */
+.reader-fullscreen.zoomed .tap-zone{
+  pointer-events:auto;
+}
+
+/* El centro se desactiva mientras hay zoom para no ocultar controles al mover el PDF. */
+.reader-fullscreen.zoomed .reader-center-zone{
+  pointer-events:none;
+}
