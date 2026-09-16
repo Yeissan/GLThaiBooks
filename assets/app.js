@@ -161,6 +161,22 @@ async function renderReader(id){
       full.classList.toggle('zoomed',zoom>1.01);
     }
 
+    function clampPan(){
+      if(zoom<=1.01){
+        panX=0;
+        panY=0;
+        return;
+      }
+
+      const scaledW=canvas.clientWidth*zoom;
+      const scaledH=canvas.clientHeight*zoom;
+      const maxX=Math.max(0,(scaledW-pageArea.clientWidth)/2);
+      const maxY=Math.max(0,(scaledH-pageArea.clientHeight)/2);
+
+      panX=Math.max(-maxX,Math.min(maxX,panX));
+      panY=Math.max(-maxY,Math.min(maxY,panY));
+    }
+
     function resetZoom(){
       zoom=1;
       panX=0;
@@ -186,7 +202,8 @@ async function renderReader(id){
         canvas.style.height=`${Math.floor(viewport.height)}px`;
         await page.render({canvasContext:ctx,viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
         currentPage=pageNum;
-        resetZoom();
+        clampPan();
+        applyTransform();
         const percent=pct(currentPage,pdf.numPages);
         pageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
         topPageLabel.textContent=`Página ${currentPage} de ${pdf.numPages}`;
@@ -277,6 +294,7 @@ async function renderReader(id){
 
         panX=panOriginX+dx;
         panY=panOriginY+dy;
+        clampPan();
         applyTransform();
       }
     },{passive:false});
