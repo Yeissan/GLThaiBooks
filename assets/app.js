@@ -403,15 +403,6 @@ async function renderReader(id){
         applyTransform();
       }
     });
-// Ratón / escritorio.
-e.stopPropagation();
-      prev();
-    });
-e.stopPropagation();
-      next();
-    });
-
-
     // ------------------------------------------------------------
     // Cambio de página con Pointer Events.
     // Esto evita el conflicto entre pinch-zoom y touchend/click
