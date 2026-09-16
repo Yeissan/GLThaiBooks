@@ -2,7 +2,9 @@
   "books": [
     {
       "id": "libro-de-ejemplo",
+      "type": "book",
       "title": "Libro de ejemplo",
+      "volume_number": null,
       "author": "Autor",
       "year": "2026",
       "language": "Español",
@@ -18,7 +20,9 @@
     },
     {
       "id": "juliet-juliet",
+      "type": "book",
       "title": "Juliet & Juliet",
+      "volume_number": null,
       "author": "",
       "year": "",
       "language": "",
