@@ -1,83 +1,12 @@
-
-const app=document.getElementById('app');
-let catalog=[];
-let pdfjsLib=null;
-const tg=window.Telegram?.WebApp;
-if(tg){tg.ready();tg.expand();}
-
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function setHash(v){location.hash=v}
-function progressKey(id){return `glthai_book_progress_${id}`}
-
-async function getProgress(id){
-  const key=progressKey(id);
-  if(tg?.CloudStorage?.getItem){
-    try{
-      const value=await new Promise((resolve,reject)=>{
-        tg.CloudStorage.getItem(key,(err,value)=>err?reject(err):resolve(value));
-      });
-      if(value)return JSON.parse(value);
-    }catch(_){}
-  }
-  try{return JSON.parse(localStorage.getItem(key)||'null')}catch(_){return null}
-}
-
-async function saveProgress(id,data){
-  const key=progressKey(id),value=JSON.stringify(data);
-  try{localStorage.setItem(key,value)}catch(_){}
-  if(tg?.CloudStorage?.setItem){
-    try{
-      await new Promise((resolve,reject)=>{
-        tg.CloudStorage.setItem(key,value,err=>err?reject(err):resolve());
-      });
-    }catch(_){}
-  }
-}
-function pct(page,total){return total?Math.max(0,Math.min(100,Math.round(page/total*100))):0}
-
-async function renderCatalog(){
-  app.className='app';
-  app.innerHTML=`
-    <div class="topbar"><div><div class="brand">GL Thai Books 📚</div><div class="sub">Selecciona un libro</div></div></div>
-    <input id="q" class="search" placeholder="Buscar libro, autor o género…" autocomplete="off">
-    <div id="grid" class="grid"></div>`;
-  const q=document.getElementById('q'),grid=document.getElementById('grid');
-  async function paint(){
-    const x=q.value.trim().toLowerCase();
-    const rows=catalog.filter(b=>[b.title,b.author,b.year,(b.genres||[]).join(' ')].join(' ').toLowerCase().includes(x));
-    if(!rows.length){grid.innerHTML=`<div class="empty">No encontré libros.</div>`;return}
-    const cards=await Promise.all(rows.map(async b=>{
-      const p=await getProgress(b.id);
-      const percent=p?.total?pct(p.page,p.total):0;
-      const status=percent>=100?'✅ Terminado':percent>0?`📖 ${percent}% leído`:'📘 Sin empezar';
-      return `<button class="card" data-id="${esc(b.id)}"><img src="${esc(b.cover||'')}" alt="Portada de ${esc(b.title)}"><div class="meta"><h3>${esc(b.title)}</h3><p>${esc(b.author||'')}${b.year?' • '+esc(b.year):''}</p><div class="progress-row"><div class="progress-label"><span>${status}</span><span>${percent}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div></div></div></button>`;
-    }));
-    grid.innerHTML=cards.join('');
-    grid.querySelectorAll('.card').forEach(btn=>btn.addEventListener('click',()=>setHash('libro='+encodeURIComponent(btn.dataset.id))));
-  }
-  q.addEventListener('input',paint);paint();
-}
-
-function info(label,val){return val?`<div class="info-item"><b>${esc(label)}</b>${esc(val)}</div>`:''}
-
-async function renderBook(id){
-  const b=catalog.find(x=>x.id===id);if(!b)return renderCatalog();
-  const p=await getProgress(id);const percent=p?.total?pct(p.page,p.total):0;
-  const resume=percent>0&&percent<100?`Continuar por la página ${p.page}`:percent>=100?'Volver a leer':'Empezar a leer';
-  app.className='app';
-  app.innerHTML=`
-    <div class="topbar"><button class="back" id="back">← Libros</button><div><div class="brand">${esc(b.title)}</div><div class="sub">Ficha del libro</div></div></div>
-    <img class="book-cover" src="${esc(b.cover||'')}" alt="Portada de ${esc(b.title)}">
-    <h1 class="title">${esc(b.title)}</h1>
-    ${b.author?`<div class="author">✍️ ${esc(b.author)}</div>`:''}
-    <div class="chips">${[b.year,b.language,...(b.genres||[])].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>
-    <p class="plot">${esc(b.description||'')}</p>
-    <div class="info-grid">${info('Autor',b.author)}${info('Año',b.year)}${info('Idioma',b.language)}${info('Editorial',b.publisher)}</div>
-    <button class="read-link" id="open-reader"><span class="read-name">📖 ${esc(resume)}</span><span class="read-arrow">→</span></button>`;
-  document.getElementById('back').addEventListener('click',()=>setHash(''));
-  document.getElementById('open-reader').addEventListener('click',()=>setHash('leer='+encodeURIComponent(id)));
-}
-
+const app=document.getElementById('app');let catalog=[];let pdfjsLib=null;const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand();}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function setHash(v){location.hash=v}function progressKey(id){return `glthai_book_progress_${id}`}
+async function getProgress(id){const k=progressKey(id);if(tg?.CloudStorage?.getItem){try{const v=await new Promise((r,j)=>tg.CloudStorage.getItem(k,(e,v)=>e?j(e):r(v)));if(v)return JSON.parse(v)}catch(_){}}try{return JSON.parse(localStorage.getItem(k)||'null')}catch(_){return null}}
+async function saveProgress(id,d){const k=progressKey(id),v=JSON.stringify(d);try{localStorage.setItem(k,v)}catch(_){}if(tg?.CloudStorage?.setItem){try{await new Promise((r,j)=>tg.CloudStorage.setItem(k,v,e=>e?j(e):r()))}catch(_){}}}
+function pct(p,t){return t?Math.max(0,Math.min(100,Math.round(p/t*100))):0}function allBooks(){const a=[];for(const i of catalog){if(i.type==='saga'){for(const v of (i.volumes||[]))a.push(v)}else a.push(i)}return a}function findBookById(id){return allBooks().find(b=>b.id===id)}function findSagaById(id){return catalog.find(x=>x.type==='saga'&&x.id===id)}async function prog(id){const p=await getProgress(id);return {p,percent:p?.total?pct(p.page,p.total):0}}
+async function renderCatalog(){app.className='app';app.innerHTML=`<div class="topbar"><div><div class="brand">GL Thai Books 📚</div><div class="sub">Selecciona una novela o colección</div></div></div><input id="q" class="search" placeholder="Buscar novela, saga, autor o género…" autocomplete="off"><div id="grid" class="grid"></div>`;const q=document.getElementById('q'),g=document.getElementById('grid');async function paint(){const x=q.value.trim().toLowerCase(),rows=catalog.filter(i=>[i.title,i.author,i.year,(i.genres||[]).join(' '),i.type==='saga'?(i.volumes||[]).map(v=>v.title).join(' '):''].join(' ').toLowerCase().includes(x));if(!rows.length){g.innerHTML='<div class="empty">No encontré libros.</div>';return}const cards=await Promise.all(rows.map(async i=>{if(i.type==='saga'){const vs=i.volumes||[];let fin=0,read=0;for(const v of vs){const {percent}=await prog(v.id);if(percent>=100)fin++;else if(percent>0)read++}const st=vs.length&&fin===vs.length?'✅ Colección terminada':(read||fin)?`📖 ${fin}/${vs.length} terminados`:'📚 Sin empezar';return `<button class="card" data-saga="${esc(i.id)}"><img src="${esc(i.cover||'')}" alt="Portada"><div class="meta"><h3>${esc(i.title)}</h3><p>${esc(i.author||'')}</p><div class="collection-badge">📚 ${vs.length} ${vs.length===1?'libro':'libros'}</div><div class="saga-count">${st}</div></div></button>`}const {percent}=await prog(i.id),st=percent>=100?'✅ Terminado':percent>0?`📖 ${percent}% leído`:'📘 Sin empezar';return `<button class="card" data-book="${esc(i.id)}"><img src="${esc(i.cover||'')}" alt="Portada"><div class="meta"><h3>${esc(i.title)}</h3><p>${esc(i.author||'')}</p><div class="progress-row"><div class="progress-label"><span>${st}</span><span>${percent}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div></div></div></button>`}));g.innerHTML=cards.join('');g.querySelectorAll('[data-book]').forEach(b=>b.onclick=()=>setHash('libro='+encodeURIComponent(b.dataset.book)));g.querySelectorAll('[data-saga]').forEach(b=>b.onclick=()=>setHash('saga='+encodeURIComponent(b.dataset.saga)))}q.addEventListener('input',paint);paint()}
+function info(l,v){return v?`<div class="info-item"><b>${esc(l)}</b>${esc(v)}</div>`:''}
+async function renderSaga(id){const s=findSagaById(id);if(!s)return renderCatalog();const cards=await Promise.all((s.volumes||[]).map(async(v,n)=>{const {p,percent}=await prog(v.id),st=percent>=100?'✅ Terminado':percent>0?`📖 Página ${p.page} · ${percent}%`:'📘 Sin empezar',num=v.volume_number??(n+1);return `<button class="volume-card" data-volume="${esc(v.id)}"><img src="${esc(v.cover||s.cover||'')}" alt="Portada"><div class="volume-info"><div class="volume-number">LIBRO ${esc(num)}</div><div class="volume-title">${esc(v.title)}</div><div class="volume-meta">${st}</div><div class="volume-progress"><div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div></div></div><div class="volume-arrow">→</div></button>`}));app.className='app';app.innerHTML=`<div class="topbar"><button class="back" id="back">← Biblioteca</button><div><div class="brand">${esc(s.title)}</div><div class="sub">Colección · ${(s.volumes||[]).length} libros</div></div></div><img class="book-cover" src="${esc(s.cover||'')}" alt="Portada"><h1 class="title">${esc(s.title)}</h1>${s.author?`<div class="author">✍️ ${esc(s.author)}</div>`:''}<div class="chips">${[s.year,s.language,...(s.genres||[])].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div><p class="plot">${esc(s.description||'')}</p><div class="info-grid">${info('Autor',s.author)}${info('Libros',String((s.volumes||[]).length))}${info('Idioma',s.language)}${info('Editorial',s.publisher)}</div><div class="volume-list">${cards.join('')}</div>`;document.getElementById('back').onclick=()=>setHash('');document.querySelectorAll('[data-volume]').forEach(b=>b.onclick=()=>setHash('libro='+encodeURIComponent(b.dataset.volume)+'&saga='+encodeURIComponent(s.id)))}
+async function renderBook(id,sagaId=''){const b=findBookById(id);if(!b)return renderCatalog();const {p,percent}=await prog(id),resume=percent>0&&percent<100?`Continuar por la página ${p.page}`:percent>=100?'Volver a leer':'Empezar a leer';app.className='app';app.innerHTML=`<div class="topbar"><button class="back" id="back">${sagaId?'← Colección':'← Libros'}</button><div><div class="brand">${esc(b.title)}</div><div class="sub">${b.volume_number?`Libro ${esc(b.volume_number)}`:'Ficha del libro'}</div></div></div><img class="book-cover" src="${esc(b.cover||'')}" alt="Portada"><h1 class="title">${esc(b.title)}</h1>${b.author?`<div class="author">✍️ ${esc(b.author)}</div>`:''}<div class="chips">${[b.year,b.language,...(b.genres||[])].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div><p class="plot">${esc(b.description||'')}</p><div class="info-grid">${info('Autor',b.author)}${info('Año',b.year)}${info('Idioma',b.language)}${info('Editorial',b.publisher)}</div><button class="read-link" id="open-reader"><span class="read-name">📖 ${esc(resume)}</span><span class="read-arrow">→</span></button>`;document.getElementById('back').onclick=()=>sagaId?setHash('saga='+encodeURIComponent(sagaId)):setHash('');document.getElementById('open-reader').onclick=()=>setHash('leer='+encodeURIComponent(id)+(sagaId?`&saga=${encodeURIComponent(sagaId)}`:''))}
 async function ensurePdfJs(){
   if(pdfjsLib)return pdfjsLib;
   pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');
@@ -86,7 +15,7 @@ async function ensurePdfJs(){
 }
 
 async function renderReader(id){
-  const b=catalog.find(x=>x.id===id);if(!b)return renderCatalog();
+  const b=findBookById(id);if(!b)return renderCatalog();
   app.className='';
   app.innerHTML=`
     <div class="reader-fullscreen" id="reader-fullscreen">
@@ -120,7 +49,7 @@ async function renderReader(id){
   const progressFill=document.getElementById('reader-progress-fill');
   const zoomBadge=document.getElementById('zoom-badge');
 
-  document.getElementById('back-book').addEventListener('click',()=>setHash('libro='+encodeURIComponent(id)));
+  document.getElementById('back-book').addEventListener('click',()=>{const p=new URLSearchParams(location.hash.replace(/^#/,''));const s=p.get('saga')||'';setHash('libro='+encodeURIComponent(id)+(s?`&saga=${encodeURIComponent(s)}`:''));});
 
   const pdfUrl=b.pdf_url||b.reader_url||'';
   if(!pdfUrl){
@@ -487,15 +416,4 @@ async function renderReader(id){
   }
 }
 
-async function route(){
-  const r=location.hash.match(/^#leer=(.+)$/);if(r)return renderReader(decodeURIComponent(r[1]));
-  const b=location.hash.match(/^#libro=(.+)$/);if(b)return renderBook(decodeURIComponent(b[1]));
-  return renderCatalog();
-}
-
-fetch('data/catalog.json',{cache:'no-store'})
-.then(r=>{if(!r.ok)throw new Error('No se pudo cargar data/catalog.json');return r.json()})
-.then(d=>{catalog=d.books||[];route()})
-.catch(err=>{app.innerHTML=`<div class="error"><b>No pude cargar la biblioteca.</b><br>${esc(err.message)}</div>`});
-
-window.addEventListener('hashchange',route);
+async function route(){const p=new URLSearchParams(location.hash.replace(/^#/,''));if(p.has('leer'))return renderReader(p.get('leer'));if(p.has('libro'))return renderBook(p.get('libro'),p.get('saga')||'');if(p.has('saga'))return renderSaga(p.get('saga'));return renderCatalog()}fetch('data/catalog.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('No se pudo cargar data/catalog.json');return r.json()}).then(d=>{catalog=d.books||[];route()}).catch(e=>{app.innerHTML=`<div class="error"><b>No pude cargar la biblioteca.</b><br>${esc(e.message)}</div>`});window.addEventListener('hashchange',route);
