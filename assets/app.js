@@ -403,45 +403,85 @@ async function renderReader(id){
         applyTransform();
       }
     });
+// Ratón / escritorio.
+e.stopPropagation();
+      prev();
+    });
+e.stopPropagation();
+      next();
+    });
 
 
-    function edgeTurnHandler(direction){
-      return e=>{
-        // Con un solo toque en el borde, cambia de página.
-        // Evitamos que el gesto llegue al manejador de pan/zoom.
-        if(e.touches && e.touches.length>0) return;
+    // ------------------------------------------------------------
+    // Cambio de página con Pointer Events.
+    // Esto evita el conflicto entre pinch-zoom y touchend/click
+    // dentro del WebView móvil de Telegram.
+    // ------------------------------------------------------------
+    function bindPageEdge(zone, direction){
+      let activePointerId = null;
+      let startX = 0;
+      let startY = 0;
+      let moved = false;
+
+      zone.addEventListener('pointerdown', e => {
+        // Ignorar contactos múltiples en la banda lateral.
+        if(activePointerId !== null) return;
+
+        activePointerId = e.pointerId;
+        startX = e.clientX;
+        startY = e.clientY;
+        moved = false;
+
+        try {
+          zone.setPointerCapture(e.pointerId);
+        } catch (_) {}
+
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      zone.addEventListener('pointermove', e => {
+        if(e.pointerId !== activePointerId) return;
+
+        if(
+          Math.abs(e.clientX - startX) > 12 ||
+          Math.abs(e.clientY - startY) > 12
+        ){
+          moved = true;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      zone.addEventListener('pointerup', e => {
+        if(e.pointerId !== activePointerId) return;
+
+        try {
+          zone.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+
+        const wasTap = !moved;
+
+        activePointerId = null;
+
         e.preventDefault();
         e.stopPropagation();
 
-        if(direction==='prev') prev();
+        if(!wasTap) return;
+
+        if(direction === 'prev') prev();
         else next();
-      };
+      });
+
+      zone.addEventListener('pointercancel', e => {
+        if(e.pointerId !== activePointerId) return;
+        activePointerId = null;
+      });
     }
 
-    tapLeft.addEventListener(
-      'touchend',
-      edgeTurnHandler('prev'),
-      {passive:false}
-    );
-
-    tapRight.addEventListener(
-      'touchend',
-      edgeTurnHandler('next'),
-      {passive:false}
-    );
-
-    // Ratón / escritorio.
-    tapLeft.addEventListener('click',e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      prev();
-    });
-
-    tapRight.addEventListener('click',e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      next();
-    });
+    bindPageEdge(tapLeft, 'prev');
+    bindPageEdge(tapRight, 'next');
 
     full.tabIndex=0;
     full.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')prev();if(e.key==='ArrowRight')next()});

@@ -209,3 +209,44 @@ button,input{font:inherit}
 .reader-fullscreen.zoomed .reader-center-zone{
   pointer-events:none !important;
 }
+
+
+/* ============================================================
+   POINTER EVENTS MÓVIL
+   Bordes independientes del PDF para cambiar página con zoom.
+   ============================================================ */
+.tap-zone{
+  position:absolute !important;
+  top:0 !important;
+  bottom:0 !important;
+  width:20% !important;
+  z-index:50 !important;
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+  background:transparent !important;
+  border:0 !important;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.tap-zone-left{left:0 !important}
+.tap-zone-right{right:0 !important}
+
+.reader-center-zone{
+  left:20% !important;
+  right:20% !important;
+  z-index:10 !important;
+}
+
+.pdf-stage{
+  z-index:2 !important;
+}
+
+.reader-page-area{
+  position:relative;
+  touch-action:none;
+}
+
+/* El centro puede mover el PDF; los bordes quedan reservados a páginas. */
+.reader-fullscreen.zoomed .tap-zone{
+  pointer-events:auto !important;
+}
