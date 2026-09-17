@@ -1008,12 +1008,12 @@
       "sources": [
         "https://www.naiin.com/product/detail/714239"
       ],
-      "cover": "books/Juliet & Juliet/cover.jpg",
-      "pdf_url": "books/Juliet & Juliet/Juliet & Juliet.pdf",
-      "telegram_url": "https://t.me/c/3974971985/40/45",
-      "pages": 386,
-      "available": true,
-      "folder": "books/Juliet & Juliet"
+      "cover": "",
+      "pdf_url": "",
+      "telegram_url": "",
+      "pages": null,
+      "available": false,
+      "folder": ""
     },
     {
       "id": "lets-wait-for-tomorrow-to-take-down-the-demon-lord",
